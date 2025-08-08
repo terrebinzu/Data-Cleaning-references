@@ -1,0 +1,221 @@
+## DA Week 1 - Demo
+
+#### 1. Environment Setup
+
+# Install Jupyter in terminal/command prompt if needed:
+# pip install notebook
+
+# In Jupyter Notebook:
+import pandas as pd
+import numpy as np
+
+#### 2. NumPy Basics
+
+a = np.array([1, 2, 3])
+print("Array:", a)
+
+b = np.arange(0, 10, 2)
+print("Arange:", b)
+
+c = np.linspace(0, 1, 5)
+print("Linspace:", c)
+
+# Slicing and broadcasting
+d = np.array([10, 20, 30, 40, 50])
+print("Slice d[1:4]:", d[1:4])
+d[1:4] = 100
+print("After broadcasting:", d)
+
+# Summary functions
+print("Mean:", np.mean(d))
+print("Std Dev:", np.std(d))
+print("90th percentile:", np.percentile(d, 90))
+
+#### 3. Pandas Fundamentals
+
+# Creating DataFrames
+df1 = pd.DataFrame([[1, 2], [3, 4]], columns=['A', 'B'])
+df2 = pd.DataFrame({'A': [5, 6], 'B': [7, 8]})
+df3 = pd.DataFrame(np.random.rand(3, 2), columns=['X', 'Y'])
+
+print("DataFrame 1:\n", df1)
+print("DataFrame 2:\n", df2)
+print("DataFrame 3:\n", df3)
+
+print("Head Method:\n",df1.head())
+print("\nTail Method:\n",df2.tail(10))
+
+print(df2.info())
+
+print("\nDescribe Method:\n",df3.describe())
+
+# Selecting data
+print("\nloc:\n",df1.loc[0, 'A'])  # Label-based
+print("\niloc:\n",df1.iloc[1, 1])   # Position-based
+print("\nFiltering:\n",df1[df1['A'] < 3])  # Filtering
+
+
+#### 4. Loading & Reading Data
+
+# From files
+df_csv = pd.read_csv('sample.csv')  # Ensure sample.csv exists
+# df_excel = pd.read_excel('sample.xlsx')  # Requires openpyxl or xlrd
+
+# From SQL
+import sqlite3
+conn = sqlite3.connect(':memory:')
+conn.execute("CREATE TABLE test (id INTEGER, name TEXT)")
+conn.execute("INSERT INTO test VALUES (1, 'Alice'), (2, 'Bob')")
+df_sql = pd.read_sql_query("SELECT * FROM test", conn)
+
+# From API
+import requests
+response = requests.get("https://jsonplaceholder.typicode.com/users")
+df_api = pd.DataFrame(response.json())
+print(df_api.head())
+
+#### 5. Data Types & Cleaning
+
+df = pd.DataFrame({
+    'id': [1, 2, 3],
+    'birthdate': ['2000-01-01', '1995-05-15', '1988-07-30'],
+    'category': ['A', 'B', 'A']
+})
+
+# Check types
+print(df.dtypes)
+
+# Convert types
+df['birthdate'] = pd.to_datetime(df['birthdate'])
+df['category'] = df['category'].astype('category')
+
+# Rename columns
+df.rename(columns={'id': 'ID'}, inplace=True)
+
+# Reorder columns
+df = df[['ID', 'category', 'birthdate']]
+print(df)
+
+
+#### 6. Handling Missing & Duplicate Data
+
+df = pd.DataFrame({
+    'A': [1, np.nan, 3, 3],
+    'B': [4, 5, np.nan, 4]
+})
+
+# Detect missing
+print(df.isnull().sum())
+
+# Fix missing
+df_filled = df.fillna(0)
+df_dropped = df.dropna()
+df_interp = df.interpolate()
+
+print("Replaced:\n",df_filled)
+print("Removed:\n",df_dropped)
+print("Interpolate\n",df_interp)
+
+df_new = pd.DataFrame({
+    'A': [1, 2, 3, 1],
+    'B': [4, 5, 5, 4]
+})
+
+print("Duplicate Rows:\n",df_new.duplicated())
+# Remove duplicates
+df_no_dupes = df_new.drop_duplicates()
+print("\nCleaned DataFrame:\n",df_no_dupes)
+
+# Visualize missing values (example code, run in Jupyter)
+import seaborn as sns
+import matplotlib.pyplot as plt
+sns.heatmap(df.isnull(), cbar=False)
+plt.show()
+
+
+#### 7. Error Handling & Debugging
+
+# Try/Except
+try:
+    print(df['Nonexistent'])
+except KeyError as e:
+    print("KeyError caught:", e)
+
+# Common issues
+# TypeError example:
+try:
+    df + 'string'
+except TypeError as e:
+    print("TypeError:", e)
+
+# Best practice: check before operations
+if 'A' in df.columns:
+    print("A exists!")
+    if pd.api.types.is_numeric_dtype(df['A']):
+        print("Mean: ", df['A'].mean())
+
+#### 8. Outlier Detection
+
+# Boxplot
+import seaborn as sns
+
+data = pd.DataFrame({
+    'value': [10, 12, 13, 14, 100]
+})
+sns.boxplot(x=data['value'])
+plt.show()
+
+# IQR method
+Q1 = data['value'].quantile(0.25)
+Q3 = data['value'].quantile(0.75)
+IQR = Q3 - Q1
+outliers = data[(data['value'] < Q1 - 1.5 * IQR) | (data['value'] > Q3 + 1.5 * IQR)]
+print("Outliers using IQR:\n", outliers)
+
+# Z-score method
+from scipy.stats import zscore
+z_scores = zscore(data['value'])
+print("Z-scores:\n", z_scores)
+print("\nOutliers (z > 2):\n", data[np.abs(z_scores) > 2])
+
+
+#### 9. Exploratory Data Analysis (EDA)
+
+# Sample Data
+df = pd.DataFrame({
+    'gender': ['M', 'F', 'F', 'M', 'M'],
+    'score': [88, 92, 85, 70, 90]
+})
+
+print("Sample Data:\n",df)
+
+# Descriptive statistics
+print("\nValue Counts:\n",df['gender'].value_counts())
+print("\nGroupBy:\n",df.groupby('gender')['score'].mean())
+print("\n",df.describe())
+
+# EDA with Visuals
+df['score'].hist()
+plt.title('Score Distribution')
+plt.xlabel('Score')
+plt.ylabel('Frequency')
+plt.show()
+
+df.boxplot(column='score', by='gender')
+plt.show()
+
+
+### Optional Stretch Topics
+
+# Save data
+df.to_csv('output.csv', index=False)
+# df.to_excel('output.xlsx', index=False)
+
+# SQL basics in comments:
+# SELECT * FROM table
+# SELECT column FROM table WHERE condition
+# SELECT category, AVG(score) FROM table GROUP BY category
+
+# Real-world dataset
+# df_titanic = pd.read_csv("https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv")
+# print(df_titanic.head())
