@@ -1,0 +1,361 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import mean_squared_error, r2_score, classification_report, confusion_matrix
+from sklearn.preprocessing import StandardScaler
+
+## Data Requirements
+Dataset Features:
+
+* 1,000 customers with realistic business relationships
+* 4 input features with appropriate ranges and correlations
+* 2 target variables for both regression and classification demos
+
+Realistic Business Logic:
+
+* Ad Spend ($500-$5,000): Drives both traffic and sales
+* Website Traffic (1,000-20,000): Correlated with ad spend
+* Email Campaigns (0-50): Poisson distribution (realistic for marketing)
+* Social Media Reach (5,000-100,000): Correlated with ad spend
+* Monthly Sales: Realistic ROI relationships ($2.50 per $1 ad spend)
+* High Value Customer: Logistic relationship with sales (>$25K threshold)
+
+# Data Stimulation code:
+
+# Set random seed for reproducibility
+np.random.seed(42)
+
+# Generate 1000 customers
+n_customers = 1000
+
+# Generate features with realistic correlations
+# Ad spend: $500-$5000 per month
+ad_spend = np.random.normal(2000, 800, n_customers)
+ad_spend = np.clip(ad_spend, 500, 5000)
+
+# Website traffic: 1000-20000 monthly visits (correlated with ad spend)
+website_traffic = ad_spend * 3 + np.random.normal(0, 1000, n_customers)
+website_traffic = np.clip(website_traffic, 1000, 20000)
+
+# Email campaigns: 0-50 campaigns per month
+email_campaigns = np.random.poisson(10, n_customers)
+email_campaigns = np.clip(email_campaigns, 0, 50)
+
+# Social media reach: 5000-100000 impressions (some correlation with ad spend)
+social_media_reach = ad_spend * 15 + np.random.normal(0, 10000, n_customers)
+social_media_reach = np.clip(social_media_reach, 5000, 100000)
+
+# Generate monthly sales (regression target)
+# More realistic business relationship
+monthly_sales = (
+    ad_spend * 2.5 +  # $2.5 revenue per $1 ad spend
+    website_traffic * 0.8 +  # $0.8 per website visit
+    email_campaigns * 150 +  # $150 per email campaign
+    social_media_reach * 0.02 +  # $0.02 per social media impression
+    np.random.normal(0, 2000, n_customers)  # Random noise
+)
+monthly_sales = np.clip(monthly_sales, 1000, 50000)
+
+# Generate high_value_customer (classification target)
+# Customers with sales > $25000 are high value
+# Add some randomness to make it more realistic
+sales_threshold = 25000
+high_value_prob = 1 / (1 + np.exp(-(monthly_sales - sales_threshold) / 5000))
+high_value_customer = np.random.binomial(1, high_value_prob)
+
+# Create DataFrame
+df = pd.DataFrame({
+    'ad_spend': ad_spend.round(2),
+    'website_traffic': website_traffic.round(0).astype(int),
+    'email_campaigns': email_campaigns,
+    'social_media_reach': social_media_reach.round(0).astype(int),
+    'monthly_sales': monthly_sales.round(2),
+    'high_value_customer': high_value_customer
+})
+
+df.to_csv('ecommerce_marketing_data.csv', index=False)
+print(f"\nDataset saved as 'ecommerce_marketing_data.csv'")
+
+df.head()
+
+# Display basic info
+print("E-commerce Marketing Dataset")
+print("=" * 40)
+print(f"Dataset shape: {df.shape}")
+print(f"High-value customers: {df['high_value_customer'].sum()} ({df['high_value_customer'].mean()*100:.1f}%)")
+print()
+
+# Display first few rows
+print("First 10 rows:")
+print(df.head(10))
+print()
+
+# Display summary statistics
+print("Summary Statistics:")
+print(df.describe())
+print()
+
+# Check correlations
+print("Feature Correlations with Monthly Sales:")
+features = ['ad_spend', 'website_traffic', 'email_campaigns', 'social_media_reach']
+for feature in features:
+    corr = df[feature].corr(df['monthly_sales'])
+    print(f"{feature}: {corr:.3f}")
+print()
+
+# Create visualizations
+fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+fig.suptitle('E-commerce Marketing Dataset Overview', fontsize=16)
+
+# 1. Monthly Sales Distribution
+axes[0, 0].hist(df['monthly_sales'], bins=30, alpha=0.7, color='skyblue')
+axes[0, 0].set_title('Monthly Sales Distribution')
+axes[0, 0].set_xlabel('Monthly Sales ($)')
+axes[0, 0].set_ylabel('Frequency')
+
+# 2. Ad Spend vs Monthly Sales
+axes[0, 1].scatter(df['ad_spend'], df['monthly_sales'], alpha=0.6)
+axes[0, 1].set_title('Ad Spend vs Monthly Sales')
+axes[0, 1].set_xlabel('Ad Spend ($)')
+axes[0, 1].set_ylabel('Monthly Sales ($)')
+
+# 3. Website Traffic vs Monthly Sales
+axes[0, 2].scatter(df['website_traffic'], df['monthly_sales'], alpha=0.6, color='green')
+axes[0, 2].set_title('Website Traffic vs Monthly Sales')
+axes[0, 2].set_xlabel('Website Traffic')
+axes[0, 2].set_ylabel('Monthly Sales ($)')
+
+# 4. Email Campaigns Distribution
+axes[1, 0].hist(df['email_campaigns'], bins=20, alpha=0.7, color='orange')
+axes[1, 0].set_title('Email Campaigns Distribution')
+axes[1, 0].set_xlabel('Number of Email Campaigns')
+axes[1, 0].set_ylabel('Frequency')
+
+# 5. High Value Customer Distribution
+high_value_counts = df['high_value_customer'].value_counts()
+axes[1, 1].bar(['Regular', 'High Value'], high_value_counts.values, color=['lightcoral', 'lightgreen'])
+axes[1, 1].set_title('Customer Type Distribution')
+axes[1, 1].set_ylabel('Count')
+
+# 6. Correlation Heatmap
+corr_matrix = df[features + ['monthly_sales'] + ['high_value_customer']].corr()
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0, ax=axes[1, 2])
+axes[1, 2].set_title('Feature Correlations')
+
+plt.tight_layout()
+plt.show()
+
+
+# Linear Regression
+
+#Demonstrate Linear Regression
+print("\n" + "="*50)
+print("LINEAR REGRESSION DEMO")
+print("="*50)
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+
+# Prepare data for linear regression
+X = df[['ad_spend']]
+y = df['monthly_sales']
+
+# Split data into 80% train and 20% test
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Step 1: Create model
+lr_model = LinearRegression()
+
+# Step 2: Train model
+lr_model.fit(X_train, y_train)
+
+# Step 3: Make predictions
+y_pred = lr_model.predict(X_test)
+
+# Step 4: Visualize results
+plt.scatter(X_test, y_test, alpha=0.5)
+plt.plot(X_test, y_pred, color='red', linewidth=2)
+plt.title('Revenue vs Ad Spend')
+plt.xlabel('Ad Spend (£)')
+plt.ylabel('Monthly Revenue (£)')
+
+from sklearn.metrics import mean_squared_error, r2_score
+import numpy as np
+
+# Evaluate
+r2 = r2_score(y_test, y_pred)
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+
+print(f"Linear Regression Results:")
+print(f"{'Coefficient':15s}: {lr_model.coef_[0]:.2f}") 
+print(f"{'Intercept':15s}: £{lr_model.intercept_:8.2f}")
+print(f"{'R² Score':15s}: {r2:.3f}")
+print(f"{'RMSE':15s}: £ {rmse:.2f}")
+
+# Multiple Linear Regression
+
+# Prepare data for linear regression
+features = ['ad_spend', 'website_traffic', 'email_campaigns', 'social_media_reach']
+X = df[features]
+y = df['monthly_sales']
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Step 1: Create model
+lr_model = LinearRegression()
+
+# Step 2: Train model
+lr_model.fit(X_train, y_train)
+
+# Step 3: Make predictions
+y_pred = lr_model.predict(X_test)
+
+# Evaluate
+r2 = r2_score(y_test, y_pred)
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+
+print(f"Linear Regression Results:")
+print(f"R² Score: {r2:.3f}")
+print(f"RMSE: £ {rmse:.2f}")
+print(f"Intercept: £ {lr_model.intercept_:.2f}")
+print()
+print("Feature Coefficients:")
+for feature, coef in zip(features, lr_model.coef_):
+    print(f"{feature:20s}: £{coef:8.2f}")
+
+# Logistic Regression
+
+# Demonstrate Logistic Regression
+print("="*50)
+print("LOGISTIC REGRESSION DEMO")
+print("="*50)
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+
+# Prepare data for logistic regression
+X = df[['monthly_sales']]
+y = df['high_value_customer']
+
+# Split data into 80% train and 20% test
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Step 1: Create model
+log_model = LogisticRegression(random_state=42)
+
+# Step 2: Train model
+log_model.fit(X_train, y_train)
+
+# Step 3: Make predictions
+y_pred = log_model.predict(X_test)
+y_pred_proba = log_model.predict_proba(X_test)[:, 1]
+
+# Step 4: Create realistic test cases based on actual patterns
+test_customers = [
+    # Low-value profile (below average in most metrics)
+    [18000],
+    # Medium-value profile (around average)
+    [25000],
+    # High-value profile (above average in most metrics)
+    [35000],
+    # Very high-value profile (top tier across all metrics)
+    [45000]
+]
+
+print("\nPredictions on realistic customer profiles:")
+for i, customer in enumerate(test_customers):
+    pred = log_model.predict([customer])
+    pred_proba = log_model.predict_proba([customer])
+    profile = ['Low-Value', 'Medium-Value', 'High-Value', 'Very High-Value'][i]
+    print(f"{profile} Profile: {'High-Value' if pred[0] == 1 else 'Regular'} "
+          f"(Probability: {pred_proba[0][1]:.3f})")
+    print(f"  [Sales: £{customer[0]}]")
+
+# Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+
+plt.tight_layout()
+plt.show()
+
+# Step 5: Evaluate model
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Model Accuracy: {accuracy:.3f}")
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+
+# Step 5: Visualize results
+fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+
+# Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axes[0,0])
+axes[0,0].set_title('Confusion Matrix')
+axes[0,0].set_xlabel('Predicted')
+axes[0,0].set_ylabel('Actual')
+
+# Feature Importance
+feature_names = ['Ad Spend', 'Website Traffic', 'Email Campaigns', 'Social Media Reach', 'Monthly Sales']
+coefficients = log_model.coef_[0]
+axes[0,1].barh(feature_names, coefficients)
+axes[0,1].set_title('Feature Importance (Coefficients)')
+axes[0,1].set_xlabel('Coefficient Value')
+
+# Probability Distribution
+axes[1,0].hist(y_pred_proba[y_test==0], alpha=0.7, label='Not High-Value', bins=20)
+axes[1,0].hist(y_pred_proba[y_test==1], alpha=0.7, label='High-Value', bins=20)
+axes[1,0].set_title('Probability Distribution')
+axes[1,0].set_xlabel('Predicted Probability')
+axes[1,0].set_ylabel('Frequency')
+axes[1,0].legend()
+
+# Monthly Sales vs Probability
+X_test_reset = X_test.reset_index(drop=True)
+y_test_reset = y_test.reset_index(drop=True)
+colors = ['red' if val == 1 else 'blue' for val in y_test_reset]
+axes[1,1].scatter(X_test_reset['monthly_sales'], y_pred_proba, c=colors, alpha=0.7, s=50)
+axes[1,1].set_title('Monthly Sales vs Predicted Probability')
+axes[1,1].set_xlabel('Monthly Sales ($)')
+axes[1,1].set_ylabel('Predicted Probability')
+axes[1,1].axhline(y=0.5, color='black', linestyle='--', alpha=0.5)
+
+plt.tight_layout()
+plt.show()
+
+## ROC Curve
+
+from sklearn.metrics import roc_curve, auc
+import matplotlib.pyplot as plt
+
+# Assuming you already have:
+# y_test = true labels
+# y_prob = predicted probabilities from model (not class labels)
+
+# 1. Get the False Positive Rate (fpr), True Positive Rate (tpr), and thresholds
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+
+# 2. Calculate the Area Under the Curve (AUC)
+roc_auc = auc(fpr, tpr)
+
+# 3. Plot the ROC Curve
+plt.figure(figsize=(8, 6))
+plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC Curve (AUC = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')  # Diagonal reference line
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC) Curve')
+plt.legend(loc='lower right')
+plt.grid(True)
+plt.show()
+
